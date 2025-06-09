@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LoopKit SDK - Basic Usage Example</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      button {
+        background: #007cba;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        margin: 5px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #005a8a;
+      }
+      .demo-section {
+        border: 1px solid #ddd;
+        padding: 20px;
+        margin: 20px 0;
+        border-radius: 8px;
+      }
+      .status {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 4px;
+        background: #f0f8ff;
+        border-left: 4px solid #007cba;
+      }
+      input,
+      select {
+        padding: 8px;
+        margin: 5px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>LoopKit JavaScript SDK - Demo</h1>
+
+    <div class="demo-section">
+      <h2>1. SDK Status</h2>
+      <div id="status" class="status">
+        Queue size: <span id="queueSize">0</span> events
+      </div>
+      <button onclick="updateStatus()">Refresh Status</button>
+      <button onclick="flushEvents()">Flush Events</button>
+      <button onclick="resetSDK()">Reset SDK</button>
+    </div>
+
+    <div class="demo-section">
+      <h2>2. Event Tracking</h2>
+      <input
+        type="text"
+        id="eventName"
+        placeholder="Event name"
+        value="button_clicked"
+      />
+      <input
+        type="text"
+        id="eventProperty"
+        placeholder="Property key"
+        value="button_name"
+      />
+      <input
+        type="text"
+        id="eventValue"
+        placeholder="Property value"
+        value="demo_button"
+      />
+      <button onclick="trackEvent()">Track Event</button>
+
+      <h3>Pre-built Events:</h3>
+      <button onclick="trackPageView()">Track Page View</button>
+      <button onclick="trackSignup()">Track Signup</button>
+      <button onclick="trackPurchase()">Track Purchase</button>
+    </div>
+
+    <div class="demo-section">
+      <h2>3. User Management</h2>
+      <input type="text" id="userId" placeholder="User ID" value="user_123" />
+      <input
+        type="text"
+        id="userEmail"
+        placeholder="Email"
+        value="user@example.com"
+      />
+      <button onclick="identifyUser()">Identify User</button>
+
+      <br /><br />
+
+      <input
+        type="text"
+        id="groupId"
+        placeholder="Group ID"
+        value="company_456"
+      />
+      <input
+        type="text"
+        id="groupName"
+        placeholder="Group Name"
+        value="Acme Corp"
+      />
+      <button onclick="groupUser()">Set Group</button>
+    </div>
+
+    <div class="demo-section">
+      <h2>4. Batch Tracking</h2>
+      <button onclick="trackBatch()">Track Batch Events</button>
+    </div>
+
+    <div class="demo-section">
+      <h2>5. Configuration</h2>
+      <label>
+        Debug Mode:
+        <select id="debugMode" onchange="toggleDebug()">
+          <option value="false">Off</option>
+          <option value="true">On</option>
+        </select>
+      </label>
+      <br />
+      <label>
+        Batch Size:
+        <input
+          type="number"
+          id="batchSize"
+          value="50"
+          onchange="updateBatchSize()"
+        />
+      </label>
+      <br />
+      <label>
+        Flush Interval (seconds):
+        <input
+          type="number"
+          id="flushInterval"
+          value="30"
+          onchange="updateFlushInterval()"
+        />
+      </label>
+    </div>
+
+    <div class="demo-section">
+      <h2>6. Error Simulation</h2>
+      <button onclick="simulateError()">Simulate JavaScript Error</button>
+      <button onclick="simulateNetworkError()">
+        Test Network Error Handling
+      </button>
+    </div>
+
+    <!-- Load LoopKit SDK -->
+    <script src="../dist/loopkit.min.js"></script>
+
+    <script>
+      // Initialize LoopKit
+      LoopKit.init('demo-api-key', {
+        debug: true,
+        enableAutoCapture: true,
+        enableErrorTracking: true,
+        onBeforeTrack: function (event) {
+          console.log('Before track:', event);
+          return event;
+        },
+        onAfterTrack: function (event, success) {
+          console.log(
+            'After track:',
+            event.name,
+            success ? 'success' : 'failed'
+          );
+          updateStatus();
+        },
+        onError: function (error) {
+          console.error('LoopKit error:', error);
+          alert('Error: ' + error.message);
+        },
+      });
+
+      // Track initial page view
+      LoopKit.track('page_view', {
+        page: window.location.pathname,
+        title: document.title,
+        example: 'basic_usage',
+      });
+
+      // Status functions
+      function updateStatus() {
+        document.getElementById('queueSize').textContent =
+          LoopKit.getQueueSize();
+      }
+
+      function flushEvents() {
+        LoopKit.flush()
+          .then(() => {
+            alert('Events flushed successfully!');
+            updateStatus();
+          })
+          .catch((error) => {
+            alert('Flush failed: ' + error.message);
+          });
+      }
+
+      function resetSDK() {
+        LoopKit.reset();
+        alert('SDK reset successfully!');
+        updateStatus();
+      }
+
+      // Event tracking functions
+      function trackEvent() {
+        const name = document.getElementById('eventName').value;
+        const propKey = document.getElementById('eventProperty').value;
+        const propValue = document.getElementById('eventValue').value;
+
+        const properties = {};
+        if (propKey && propValue) {
+          properties[propKey] = propValue;
+        }
+
+        LoopKit.track(name, properties);
+        updateStatus();
+      }
+
+      function trackPageView() {
+        LoopKit.track('page_view', {
+          page: window.location.pathname,
+          title: document.title,
+        });
+        updateStatus();
+      }
+
+      function trackSignup() {
+        LoopKit.track('user_signup', {
+          method: 'demo',
+          source: 'example_page',
+          plan: 'free',
+        });
+        updateStatus();
+      }
+
+      function trackPurchase() {
+        LoopKit.track('purchase_completed', {
+          amount: 99.99,
+          currency: 'USD',
+          plan: 'pro',
+          payment_method: 'demo',
+        });
+        updateStatus();
+      }
+
+      // User management functions
+      function identifyUser() {
+        const userId = document.getElementById('userId').value;
+        const email = document.getElementById('userEmail').value;
+
+        LoopKit.identify(userId, {
+          email: email,
+          signup_date: new Date().toISOString().split('T')[0],
+          source: 'demo',
+        });
+        updateStatus();
+      }
+
+      function groupUser() {
+        const groupId = document.getElementById('groupId').value;
+        const groupName = document.getElementById('groupName').value;
+
+        LoopKit.group(
+          groupId,
+          {
+            name: groupName,
+            plan: 'enterprise',
+            employee_count: 50,
+          },
+          'organization'
+        );
+        updateStatus();
+      }
+
+      // Batch tracking
+      function trackBatch() {
+        const events = [
+          {
+            name: 'batch_event_1',
+            properties: { batch: true, order: 1 },
+          },
+          {
+            name: 'batch_event_2',
+            properties: { batch: true, order: 2 },
+          },
+          {
+            name: 'batch_event_3',
+            properties: { batch: true, order: 3 },
+          },
+        ];
+
+        LoopKit.trackBatch(events);
+        updateStatus();
+      }
+
+      // Configuration functions
+      function toggleDebug() {
+        const debug = document.getElementById('debugMode').value === 'true';
+        LoopKit.configure({ debug: debug });
+      }
+
+      function updateBatchSize() {
+        const batchSize = parseInt(document.getElementById('batchSize').value);
+        LoopKit.configure({ batchSize: batchSize });
+      }
+
+      function updateFlushInterval() {
+        const flushInterval = parseInt(
+          document.getElementById('flushInterval').value
+        );
+        LoopKit.configure({ flushInterval: flushInterval });
+      }
+
+      // Error simulation
+      function simulateError() {
+        throw new Error('This is a simulated JavaScript error for testing');
+      }
+
+      function simulateNetworkError() {
+        // Temporarily break the API URL to simulate network error
+        const originalURL = LoopKit.getConfig().baseURL;
+        LoopKit.configure({ baseURL: 'https://invalid-url.example.com' });
+
+        LoopKit.track('network_test_event');
+        LoopKit.flush().catch((error) => {
+          console.log('Expected network error:', error.message);
+          // Restore original URL
+          LoopKit.configure({ baseURL: originalURL });
+        });
+      }
+
+      // Auto-update status every 5 seconds
+      setInterval(updateStatus, 5000);
+
+      // Initial status update
+      updateStatus();
+    </script>
+  </body>
+</html>
