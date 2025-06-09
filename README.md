@@ -26,7 +26,7 @@ npm install @loopkit/javascript
 ### CDN
 
 ```html
-<script src="https://cdn.loopkit.ai/javascript/v1/loopkit.min.js"></script>
+<script src="https://cdn.loopkit.ai/js/loopkit.min.js"></script>
 ```
 
 ## Quick Start
@@ -251,3 +251,79 @@ npm run format
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
+
+## 🚀 CDN Deployment
+
+Deploy the LoopKit JavaScript SDK to your CDN using Amazon S3.
+
+### Setup
+
+1. **Install AWS CLI** and configure your credentials:
+
+   ```bash
+   aws configure
+   ```
+
+2. **Create environment configuration**:
+
+   ```bash
+   cp env.example .env
+   ```
+
+3. **Edit `.env` file** with your AWS configuration:
+
+   ```bash
+   # Required
+   S3_BUCKET=your-cdn-bucket-name
+   AWS_PROFILE=your-aws-profile
+   AWS_REGION=us-east-1
+
+   # Optional
+   CLOUDFRONT_DISTRIBUTION_ID=E1234567890ABC
+   UPLOAD_ALL_BUILDS=false
+   ```
+
+### Deploy
+
+```bash
+# Build and deploy to CDN
+npm run deploy:cdn
+
+# Or run directly
+./deploy.sh
+```
+
+The script will:
+
+- Build the project using Rollup
+- Upload `loopkit.min.js` as the latest version (5-minute cache)
+- Optionally upload other build files (ESM, CJS, TypeScript definitions)
+- Invalidate CloudFront cache (if configured)
+
+### Versioning Strategy
+
+The CDN only stores the latest version. For specific versions:
+
+1. **Latest**: Always available at `/js/loopkit.min.js`
+2. **Specific versions**: Rebuild from git tags as needed
+
+```bash
+# Deploy a specific version
+git checkout v1.2.3
+npm run deploy:cdn
+
+# Return to latest
+git checkout main
+```
+
+### Usage
+
+Include the SDK from your CDN:
+
+```html
+<script src="https://your-bucket.s3.amazonaws.com/js/loopkit.min.js"></script>
+<script>
+  const loopkit = new LoopKit('your-api-key');
+  loopkit.track('page_view');
+</script>
+```
