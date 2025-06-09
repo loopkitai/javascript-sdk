@@ -7,11 +7,14 @@
 
 class LoopKit {
   constructor() {
+    // SDK Version
+    this.version = '1.0.1';
+
     // Core configuration
     this.config = {
       // API Settings
       apiKey: null,
-      baseURL: 'https://api.loopkit.ai/v1',
+      baseURL: 'https://drain.loopkit.ai/v1',
 
       // Batching
       batchSize: 50,
@@ -29,6 +32,10 @@ class LoopKit {
       // Auto-capture
       enableAutoCapture: false,
       enableErrorTracking: false,
+
+      // Session Tracking
+      enableSessionTracking: true,
+      sessionTimeout: 1800, // 30 minutes of inactivity before session ends
 
       // Privacy
       respectDoNotTrack: true,
@@ -53,7 +60,10 @@ class LoopKit {
     this.groupId = null;
     this.groupProperties = {};
     this.sessionId = this.generateSessionId();
-    this.anonymousId = this.generateAnonymousId();
+    this.anonymousId = this.loadOrGenerateAnonymousId();
+    this.sessionStarted = false;
+    this.lastActivityTime = Date.now();
+    this.sessionTimer = null;
 
     // Bind methods to preserve context
     this.track = this.track.bind(this);
@@ -90,6 +100,7 @@ class LoopKit {
 
     this.log('info', 'LoopKit initialized', {
       apiKey: apiKey.substring(0, 8) + '...',
+      version: this.version,
     });
 
     // Start auto-flush timer
@@ -98,6 +109,11 @@ class LoopKit {
     // Load persisted queue
     if (this.config.enableLocalStorage) {
       this.loadPersistedQueue();
+    }
+
+    // Start session tracking
+    if (this.config.enableSessionTracking) {
+      this.startSession();
     }
 
     return this;
@@ -390,6 +406,14 @@ class LoopKit {
   }
 
   /**
+   * Get SDK version
+   * @returns {string} Current SDK version
+   */
+  getVersion() {
+    return this.version;
+  }
+
+  /**
    * Reset the SDK state
    */
   reset() {
@@ -404,7 +428,7 @@ class LoopKit {
 
     // Clear session and generate new anonymous ID
     this.sessionId = this.generateSessionId();
-    this.anonymousId = this.generateAnonymousId();
+    this.anonymousId = this.loadOrGenerateAnonymousId();
 
     // Clear timers
     if (this.flushTimer) {
@@ -412,9 +436,18 @@ class LoopKit {
       this.flushTimer = null;
     }
 
+    // Clear session tracking
+    if (this.sessionTimer) {
+      clearTimeout(this.sessionTimer);
+      this.sessionTimer = null;
+    }
+    this.sessionStarted = false;
+    this.lastActivityTime = Date.now();
+
     // Clear localStorage if enabled
     if (this.config.enableLocalStorage) {
       this.clearPersistedQueue();
+      this.clearPersistedAnonymousId();
     }
 
     // Reset initialization flag
@@ -439,7 +472,7 @@ class LoopKit {
     this.config = {
       // API Settings
       apiKey: null,
-      baseURL: 'https://api.loopkit.ai/v1',
+      baseURL: 'https://drain.loopkit.ai/v1',
 
       // Batching
       batchSize: 50,
@@ -457,6 +490,10 @@ class LoopKit {
       // Auto-capture
       enableAutoCapture: false,
       enableErrorTracking: false,
+
+      // Session Tracking
+      enableSessionTracking: true,
+      sessionTimeout: 1800, // 30 minutes of inactivity before session ends
 
       // Privacy
       respectDoNotTrack: true,
@@ -480,10 +517,16 @@ class LoopKit {
     this.groupId = null;
     this.groupProperties = {};
     this.sessionId = this.generateSessionId();
-    this.anonymousId = this.generateAnonymousId();
+    this.anonymousId = this.loadOrGenerateAnonymousId();
+    this.sessionStarted = false;
+    this.lastActivityTime = Date.now();
+    this.sessionTimer = null;
 
     // Clear localStorage
     this.clearPersistedQueue();
+    this.clearPersistedAnonymousId();
+
+    this.log('debug', 'SDK state reset');
 
     return this;
   }
@@ -503,7 +546,7 @@ class LoopKit {
     const system = {
       sdk: {
         name: '@loopkit/javascript',
-        version: '1.0.0',
+        version: this.version,
       },
       sessionId: this.sessionId,
     };
@@ -536,14 +579,14 @@ class LoopKit {
         ...baseEvent,
         userId: this.userId,
         name: data.name,
-        properties: data.properties || {},
+        properties: data.properties,
         system,
       };
     } else if (type === 'identify') {
       return {
         ...baseEvent,
         userId: data.userId,
-        properties: data.properties || {},
+        properties: data.properties,
         system,
       };
     } else if (type === 'group') {
@@ -552,7 +595,7 @@ class LoopKit {
         userId: this.userId,
         groupId: data.groupId,
         groupType: data.groupType,
-        properties: data.properties || {},
+        properties: data.properties,
         system,
       };
     }
@@ -717,6 +760,11 @@ class LoopKit {
 
     // Flush on page unload
     window.addEventListener('beforeunload', () => {
+      // End session before page unload
+      if (this.config.enableSessionTracking) {
+        this.endSession();
+      }
+
       if (this.eventQueue.length > 0) {
         // Use sendBeacon for reliability on page unload
         this.sendBeacon();
@@ -725,8 +773,22 @@ class LoopKit {
 
     // Handle visibility changes
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden' && this.eventQueue.length > 0) {
-        this.sendBeacon();
+      if (document.visibilityState === 'hidden') {
+        // End session when tab becomes hidden
+        if (this.config.enableSessionTracking) {
+          this.endSession();
+        }
+
+        if (this.eventQueue.length > 0) {
+          this.sendBeacon();
+        }
+      } else if (
+        document.visibilityState === 'visible' &&
+        this.config.enableSessionTracking
+      ) {
+        // Start new session when tab becomes visible again
+        this.sessionId = this.generateSessionId();
+        this.startSession();
       }
     });
   }
@@ -780,17 +842,68 @@ class LoopKit {
    */
   sendBeacon() {
     if (navigator.sendBeacon && this.eventQueue.length > 0) {
-      const url = `${this.config.baseURL}/events`;
-      const payload = {
-        apiKey: this.config.apiKey,
-        events: [...this.eventQueue],
+      const events = [...this.eventQueue];
+
+      // Group events by type like in flush()
+      const eventsByType = {
+        tracks: [],
+        identifies: [],
+        groups: [],
       };
 
-      const sent = navigator.sendBeacon(url, JSON.stringify(payload));
+      events.forEach((event) => {
+        if (event.name !== undefined) {
+          // Track event
+          eventsByType.tracks.push(event);
+        } else if (event.userId && event.groupId === undefined) {
+          // Identify event
+          eventsByType.identifies.push(event);
+        } else if (event.groupId) {
+          // Group event
+          eventsByType.groups.push(event);
+        }
+      });
 
-      if (sent) {
+      let successCount = 0;
+
+      // Send each event type to its respective endpoint
+      if (eventsByType.tracks.length > 0) {
+        const url = `${this.config.baseURL}/tracks?apiKey=${encodeURIComponent(this.config.apiKey)}`;
+        const payload = {
+          tracks: eventsByType.tracks,
+        };
+        if (navigator.sendBeacon(url, JSON.stringify(payload))) {
+          successCount++;
+        }
+      }
+
+      if (eventsByType.identifies.length > 0) {
+        const url = `${this.config.baseURL}/identifies?apiKey=${encodeURIComponent(this.config.apiKey)}`;
+        const payload = {
+          identifies: eventsByType.identifies,
+        };
+        if (navigator.sendBeacon(url, JSON.stringify(payload))) {
+          successCount++;
+        }
+      }
+
+      if (eventsByType.groups.length > 0) {
+        const url = `${this.config.baseURL}/groups?apiKey=${encodeURIComponent(this.config.apiKey)}`;
+        const payload = {
+          groups: eventsByType.groups,
+        };
+        if (navigator.sendBeacon(url, JSON.stringify(payload))) {
+          successCount++;
+        }
+      }
+
+      // Only clear queue if at least one beacon was sent successfully
+      if (successCount > 0) {
         this.eventQueue = [];
-        this.log('debug', 'Events sent via beacon');
+        this.log(
+          'debug',
+          `Events sent via beacon to ${successCount} endpoints`
+        );
       }
     }
   }
@@ -860,6 +973,25 @@ class LoopKit {
   }
 
   /**
+   * Clear persisted anonymous ID from localStorage
+   */
+  clearPersistedAnonymousId() {
+    const storage =
+      typeof global !== 'undefined' && global.localStorage
+        ? global.localStorage
+        : typeof localStorage !== 'undefined'
+          ? localStorage
+          : null;
+    if (storage) {
+      try {
+        storage.removeItem('loopkit_anonymousId');
+      } catch (error) {
+        this.log('warn', 'Failed to clear persisted anonymous ID', error);
+      }
+    }
+  }
+
+  /**
    * Generate a unique session ID
    */
   generateSessionId() {
@@ -867,10 +999,40 @@ class LoopKit {
   }
 
   /**
-   * Generate a unique anonymous ID
+   * Load or generate a unique anonymous ID
    */
-  generateAnonymousId() {
-    return 'anon_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+  loadOrGenerateAnonymousId() {
+    const storage =
+      typeof global !== 'undefined' && global.localStorage
+        ? global.localStorage
+        : typeof localStorage !== 'undefined'
+          ? localStorage
+          : null;
+    if (storage) {
+      try {
+        const stored = storage.getItem('loopkit_anonymousId');
+        if (stored) {
+          return stored;
+        }
+      } catch (error) {
+        this.log('warn', 'Failed to load anonymous ID', error);
+      }
+    }
+
+    // Generate new anonymous ID
+    const newAnonymousId =
+      'anon_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+
+    // Try to save it to localStorage
+    if (storage) {
+      try {
+        storage.setItem('loopkit_anonymousId', newAnonymousId);
+      } catch (error) {
+        this.log('warn', 'Failed to save anonymous ID', error);
+      }
+    }
+
+    return newAnonymousId;
   }
 
   /**
@@ -911,6 +1073,10 @@ class LoopKit {
     if (this.config.maxRetries < 0) {
       throw new Error('maxRetries must be >= 0');
     }
+
+    if (this.config.sessionTimeout <= 0) {
+      throw new Error('sessionTimeout must be greater than 0');
+    }
   }
 
   /**
@@ -933,6 +1099,126 @@ class LoopKit {
         console[level](logMessage);
       }
     }
+  }
+
+  /**
+   * Start a new session
+   */
+  startSession() {
+    if (this.sessionStarted) {
+      return; // Session already started
+    }
+
+    this.sessionStarted = true;
+    this.lastActivityTime = Date.now();
+
+    // Track session start event
+    this.track('session_start', {
+      session_id: this.sessionId,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Set up activity tracking
+    this.setupActivityTracking();
+
+    this.log('debug', 'Session started', { sessionId: this.sessionId });
+  }
+
+  /**
+   * End the current session
+   */
+  endSession() {
+    if (!this.sessionStarted) {
+      return; // No active session
+    }
+
+    const sessionDuration = Math.round(
+      (Date.now() - this.lastActivityTime) / 1000
+    );
+
+    // Track session end event
+    this.track('session_end', {
+      session_id: this.sessionId,
+      session_duration: sessionDuration,
+      timestamp: new Date().toISOString(),
+    });
+
+    this.sessionStarted = false;
+
+    // Clear session timer
+    if (this.sessionTimer) {
+      clearTimeout(this.sessionTimer);
+      this.sessionTimer = null;
+    }
+
+    this.log('debug', 'Session ended', {
+      sessionId: this.sessionId,
+      duration: sessionDuration,
+    });
+  }
+
+  /**
+   * Update activity timestamp and reset session timeout
+   */
+  updateActivity() {
+    this.lastActivityTime = Date.now();
+
+    // Reset session timeout
+    if (this.sessionTimer) {
+      clearTimeout(this.sessionTimer);
+    }
+
+    // Set new timeout for session end
+    this.sessionTimer = setTimeout(() => {
+      this.endSession();
+    }, this.config.sessionTimeout * 1000);
+  }
+
+  /**
+   * Setup activity tracking for session management
+   */
+  setupActivityTracking() {
+    if (typeof window === 'undefined') {
+      return; // Node.js environment
+    }
+
+    const activityEvents = [
+      'mousedown',
+      'mousemove',
+      'keypress',
+      'scroll',
+      'touchstart',
+      'click',
+    ];
+
+    const throttledUpdateActivity = this.throttle(() => {
+      this.updateActivity();
+    }, 5000); // Throttle to every 5 seconds
+
+    activityEvents.forEach((eventType) => {
+      window.addEventListener(eventType, throttledUpdateActivity, {
+        passive: true,
+      });
+    });
+
+    // Initial activity update
+    this.updateActivity();
+  }
+
+  /**
+   * Throttle function to limit how often activity updates
+   */
+  throttle(func, limit) {
+    let inThrottle;
+    return function () {
+      const args = arguments;
+      const context = this;
+      if (!inThrottle) {
+        func.apply(context, args);
+        inThrottle = true;
+        setTimeout(() => (inThrottle = false), limit);
+      }
+    };
   }
 }
 
