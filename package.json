@@ -1,6 +1,6 @@
 {
     "name": "@loopkit/javascript",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "description": "LoopKit JavaScript SDK for tracking events and user analytics",
     "main": "dist/loopkit.js",
     "module": "dist/loopkit.esm.js",

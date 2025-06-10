@@ -375,6 +375,42 @@ describe('LoopKit SDK', () => {
 
       expect(LoopKit.getQueueSize()).toBe(1);
     });
+
+    test('should clear localStorage if events were created by different version', () => {
+      // Simulate events stored by a different version
+      const oldVersionData = JSON.stringify({
+        version: '1.0.3', // Different from current version
+        events: [{ name: 'old_event', properties: { old: true } }],
+        timestamp: Date.now(),
+      });
+
+      global.localStorage.getItem.mockReturnValueOnce(oldVersionData);
+
+      LoopKit.init('test-api-key', { enableLocalStorage: true });
+
+      // Should have cleared the old events and started fresh
+      expect(global.localStorage.removeItem).toHaveBeenCalledWith(
+        'loopkit_queue'
+      );
+      expect(LoopKit.getQueueSize()).toBe(0);
+    });
+
+    test('should clear localStorage if legacy format detected', () => {
+      // Simulate old format (just an array of events)
+      const legacyData = JSON.stringify([
+        { name: 'legacy_event', properties: { legacy: true } },
+      ]);
+
+      global.localStorage.getItem.mockReturnValueOnce(legacyData);
+
+      LoopKit.init('test-api-key', { enableLocalStorage: true });
+
+      // Should have cleared the legacy events
+      expect(global.localStorage.removeItem).toHaveBeenCalledWith(
+        'loopkit_queue'
+      );
+      expect(LoopKit.getQueueSize()).toBe(0);
+    });
   });
 
   describe('Reset', () => {

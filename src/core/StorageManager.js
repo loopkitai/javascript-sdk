@@ -29,7 +29,7 @@ export class StorageManager {
   }
 
   /**
-   * Persist event queue to localStorage
+   * Persist event queue to localStorage with version tracking
    */
   persistQueue(queue) {
     if (!this.config.enableLocalStorage) {
@@ -39,7 +39,12 @@ export class StorageManager {
     const storage = this.getStorage();
     if (storage) {
       try {
-        storage.setItem('loopkit_queue', JSON.stringify(queue));
+        const data = {
+          version: typeof __VERSION__ !== 'undefined' ? __VERSION__ : '1.0.4', // eslint-disable-line no-undef
+          events: queue,
+          timestamp: Date.now(),
+        };
+        storage.setItem('loopkit_queue', JSON.stringify(data));
       } catch (error) {
         this.logger.warn('Failed to persist queue', error);
       }
@@ -47,7 +52,7 @@ export class StorageManager {
   }
 
   /**
-   * Load persisted queue from localStorage
+   * Load persisted queue from localStorage with version checking
    */
   loadQueue() {
     if (!this.config.enableLocalStorage) {
@@ -59,13 +64,42 @@ export class StorageManager {
       try {
         const stored = storage.getItem('loopkit_queue');
         if (stored) {
-          const events = JSON.parse(stored);
-          if (Array.isArray(events)) {
-            return events;
+          const data = JSON.parse(stored);
+
+          // Handle legacy format (just an array) - clear it
+          if (Array.isArray(data)) {
+            this.logger.debug('Legacy event format detected, clearing queue');
+            this.clearQueue();
+            return [];
+          }
+
+          // Handle new format with version checking
+          if (data && typeof data === 'object' && data.version && data.events) {
+            const currentVersion =
+              typeof __VERSION__ !== 'undefined' ? __VERSION__ : '1.0.4'; // eslint-disable-line no-undef
+
+            if (data.version !== currentVersion) {
+              this.logger.debug(
+                `Version mismatch detected (stored: ${data.version}, current: ${currentVersion}), clearing queue`
+              );
+              this.clearQueue();
+              return [];
+            }
+
+            if (Array.isArray(data.events)) {
+              this.logger.debug(
+                `Loaded ${data.events.length} events from storage (version: ${data.version})`
+              );
+              return data.events;
+            }
           }
         }
       } catch (error) {
-        this.logger.warn('Failed to load persisted queue', error);
+        this.logger.warn(
+          'Failed to load persisted queue, clearing corrupted data',
+          error
+        );
+        this.clearQueue();
       }
     }
     return [];
