@@ -643,7 +643,7 @@ class LoopKit {
    * Send events to the API
    */
   async sendEvents(endpoint, events, retryCount = 0) {
-    const url = `${this.config.baseURL}/${endpoint}`;
+    const url = `${this.config.baseURL}/${endpoint}?apiKey=${encodeURIComponent(this.config.apiKey)}`;
 
     // Create payload based on endpoint type
     let payload;
@@ -658,14 +658,14 @@ class LoopKit {
       throw new Error(`Invalid endpoint: ${endpoint}`);
     }
 
+    // add "type": "fetch" to all track events properties TODO
+    payload.tracks.forEach((track) => {
+      track.properties.type = 'fetch';
+    });
+
     const headers = {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${this.config.apiKey}`,
     };
-
-    if (this.config.enableCompression) {
-      headers['Content-Encoding'] = 'gzip';
-    }
 
     try {
       const controller = new AbortController();
@@ -771,25 +771,16 @@ class LoopKit {
       }
     });
 
-    // Handle visibility changes
+    // Handle visibility changes - just flush events, don't end sessions
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') {
-        // End session when tab becomes hidden
-        if (this.config.enableSessionTracking) {
-          this.endSession();
-        }
-
+        // Flush any pending events when tab becomes hidden
         if (this.eventQueue.length > 0) {
           this.sendBeacon();
         }
-      } else if (
-        document.visibilityState === 'visible' &&
-        this.config.enableSessionTracking
-      ) {
-        // Start new session when tab becomes visible again
-        this.sessionId = this.generateSessionId();
-        this.startSession();
       }
+      // Note: We no longer end/start sessions on visibility changes
+      // Sessions will only end on actual page unload or after the inactivity timeout
     });
   }
 
@@ -1090,13 +1081,25 @@ class LoopKit {
     const messageLevel = levels.indexOf(level);
 
     if (messageLevel <= configLevel) {
-      const timestamp = new Date().toISOString();
-      const logMessage = `[LoopKit ${timestamp}] ${message}`;
+      const now = new Date();
+      const fullTimestamp = `${now.toLocaleDateString()} ${now.toLocaleTimeString()}.${now.getMilliseconds().toString().padStart(3, '0')}`;
+
+      // Build log message with timestamp and version at the end
+      const logData = {
+        ...data,
+        timestamp: fullTimestamp,
+        version: this.version,
+      };
+
+      const logMessage = `[LoopKit] ${message}`;
 
       if (data) {
-        console[level](logMessage, data);
+        console[level](logMessage, logData);
       } else {
-        console[level](logMessage);
+        console[level](logMessage, {
+          timestamp: fullTimestamp,
+          version: this.version,
+        });
       }
     }
   }
