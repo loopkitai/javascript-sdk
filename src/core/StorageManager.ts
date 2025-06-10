@@ -1,8 +1,22 @@
+import type { LoopKitConfig, IStorageManager } from '../types/index.js';
+import type { Logger } from '../utils/Logger.js';
+
+declare const __VERSION__: string;
+
+interface StorageData {
+  version: string;
+  events: any[];
+  timestamp: number;
+}
+
 /**
  * Storage manager for localStorage operations
  */
-export class StorageManager {
-  constructor(config, logger) {
+export class StorageManager implements IStorageManager {
+  private config: LoopKitConfig;
+  private logger: Logger;
+
+  constructor(config: LoopKitConfig, logger: Logger) {
     this.config = config;
     this.logger = logger;
   }
@@ -10,15 +24,14 @@ export class StorageManager {
   /**
    * Update configuration
    */
-  updateConfig(config) {
+  updateConfig(config: LoopKitConfig): void {
     this.config = config;
   }
 
   /**
    * Get localStorage instance with fallback
-   * @private
    */
-  getStorage() {
+  private getStorage(): Storage | null {
     const storage =
       typeof global !== 'undefined' && global.localStorage
         ? global.localStorage
@@ -31,7 +44,7 @@ export class StorageManager {
   /**
    * Persist event queue to localStorage with version tracking
    */
-  persistQueue(queue) {
+  persistQueue(queue: any[]): void {
     if (!this.config.enableLocalStorage) {
       return;
     }
@@ -39,14 +52,14 @@ export class StorageManager {
     const storage = this.getStorage();
     if (storage) {
       try {
-        const data = {
-          version: typeof __VERSION__ !== 'undefined' ? __VERSION__ : '1.0.4', // eslint-disable-line no-undef
+        const data: StorageData = {
+          version: typeof __VERSION__ !== 'undefined' ? __VERSION__ : '1.0.4',
           events: queue,
           timestamp: Date.now(),
         };
         storage.setItem('loopkit_queue', JSON.stringify(data));
       } catch (error) {
-        this.logger.warn('Failed to persist queue', error);
+        this.logger.warn('Failed to persist queue', { error });
       }
     }
   }
@@ -54,7 +67,7 @@ export class StorageManager {
   /**
    * Load persisted queue from localStorage with version checking
    */
-  loadQueue() {
+  loadQueue(): any[] {
     if (!this.config.enableLocalStorage) {
       return [];
     }
@@ -69,20 +82,34 @@ export class StorageManager {
           // Handle legacy format (just an array) - clear it
           if (Array.isArray(data)) {
             this.logger.debug('Legacy event format detected, clearing queue');
-            this.clearQueue();
+            if (storage) {
+              try {
+                storage.removeItem('loopkit_queue');
+              } catch (error) {
+                this.logger.warn('Failed to clear persisted queue', { error });
+              }
+            }
             return [];
           }
 
           // Handle new format with version checking
           if (data && typeof data === 'object' && data.version && data.events) {
             const currentVersion =
-              typeof __VERSION__ !== 'undefined' ? __VERSION__ : '1.0.4'; // eslint-disable-line no-undef
+              typeof __VERSION__ !== 'undefined' ? __VERSION__ : '1.0.4';
 
             if (data.version !== currentVersion) {
               this.logger.debug(
                 `Version mismatch detected (stored: ${data.version}, current: ${currentVersion}), clearing queue`
               );
-              this.clearQueue();
+              if (storage) {
+                try {
+                  storage.removeItem('loopkit_queue');
+                } catch (error) {
+                  this.logger.warn('Failed to clear persisted queue', {
+                    error,
+                  });
+                }
+              }
               return [];
             }
 
@@ -97,7 +124,7 @@ export class StorageManager {
       } catch (error) {
         this.logger.warn(
           'Failed to load persisted queue, clearing corrupted data',
-          error
+          { error }
         );
         this.clearQueue();
       }
@@ -108,7 +135,7 @@ export class StorageManager {
   /**
    * Clear persisted queue from localStorage
    */
-  clearQueue() {
+  clearQueue(): void {
     if (!this.config.enableLocalStorage) {
       return;
     }
@@ -118,7 +145,7 @@ export class StorageManager {
       try {
         storage.removeItem('loopkit_queue');
       } catch (error) {
-        this.logger.warn('Failed to clear persisted queue', error);
+        this.logger.warn('Failed to clear persisted queue', { error });
       }
     }
   }
@@ -126,7 +153,7 @@ export class StorageManager {
   /**
    * Load anonymous ID from localStorage
    */
-  loadAnonymousId() {
+  loadAnonymousId(): string | null {
     if (!this.config.enableLocalStorage) {
       return null;
     }
@@ -139,7 +166,7 @@ export class StorageManager {
           return stored;
         }
       } catch (error) {
-        this.logger.warn('Failed to load anonymous ID', error);
+        this.logger.warn('Failed to load anonymous ID', { error });
       }
     }
     return null;
@@ -148,7 +175,7 @@ export class StorageManager {
   /**
    * Save anonymous ID to localStorage
    */
-  saveAnonymousId(anonymousId) {
+  saveAnonymousId(anonymousId: string): void {
     if (!this.config.enableLocalStorage) {
       return;
     }
@@ -158,7 +185,7 @@ export class StorageManager {
       try {
         storage.setItem('loopkit_anonymousId', anonymousId);
       } catch (error) {
-        this.logger.warn('Failed to save anonymous ID', error);
+        this.logger.warn('Failed to save anonymous ID', { error });
       }
     }
   }
@@ -166,7 +193,7 @@ export class StorageManager {
   /**
    * Clear anonymous ID from localStorage
    */
-  clearAnonymousId() {
+  clearAnonymousId(): void {
     if (!this.config.enableLocalStorage) {
       return;
     }
@@ -176,7 +203,7 @@ export class StorageManager {
       try {
         storage.removeItem('loopkit_anonymousId');
       } catch (error) {
-        this.logger.warn('Failed to clear anonymous ID', error);
+        this.logger.warn('Failed to clear anonymous ID', { error });
       }
     }
   }
@@ -184,7 +211,7 @@ export class StorageManager {
   /**
    * Clear all LoopKit data from localStorage
    */
-  clearAll() {
+  clearAll(): void {
     this.clearQueue();
     this.clearAnonymousId();
   }

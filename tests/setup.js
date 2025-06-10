@@ -79,16 +79,33 @@ Object.defineProperty(document, 'referrer', {
   writable: true,
 });
 
-// Reset all mocks before each test
+// Reset mocks before each test to ensure isolation
 beforeEach(() => {
-  jest.clearAllMocks();
-  fetch.mockClear();
-  localStorageMock.getItem.mockClear();
-  localStorageMock.setItem.mockClear();
-  localStorageMock.removeItem.mockClear();
-  localStorageMock.clear.mockClear();
-  navigator.sendBeacon.mockClear();
+  // Reset all fetch mocks
+  global.fetch.mockClear();
+
+  // Reset all localStorage mocks
+  global.localStorage.getItem.mockClear();
+  global.localStorage.setItem.mockClear();
+  global.localStorage.removeItem.mockClear();
+  global.localStorage.clear.mockClear();
 
   // Reset localStorage store
-  localStorageMock.clear();
+  const store = {};
+  global.localStorage.getItem.mockImplementation((key) => store[key] || null);
+  global.localStorage.setItem.mockImplementation((key, value) => {
+    store[key] = value.toString();
+  });
+  global.localStorage.removeItem.mockImplementation((key) => {
+    delete store[key];
+  });
+  global.localStorage.clear.mockImplementation(() => {
+    Object.keys(store).forEach((key) => delete store[key]);
+  });
+
+  // Reset navigator.doNotTrack to default
+  Object.defineProperty(navigator, 'doNotTrack', {
+    writable: true,
+    value: '0',
+  });
 });

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LoopKit - Zero Config Auto Capture Demo</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      .container {
+        background: #f5f5f5;
+        padding: 20px;
+        border-radius: 8px;
+        margin: 20px 0;
+      }
+      button {
+        background: #007cba;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background: #005a87;
+      }
+      .status {
+        background: #e8f5e8;
+        padding: 15px;
+        border-radius: 4px;
+        margin: 10px 0;
+      }
+      .info {
+        background: #e6f3ff;
+        padding: 15px;
+        border-radius: 4px;
+        margin: 10px 0;
+        border-left: 4px solid #007cba;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>LoopKit Zero Config Demo</h1>
+
+    <div class="info">
+      <h3>🎉 Zero Configuration Required!</h3>
+      <p>Just initialize with your API key - everything else is automatic!</p>
+      <ul>
+        <li><strong>Page Views</strong> - Tracked automatically</li>
+        <li><strong>Click Events</strong> - All interactions tracked</li>
+        <li><strong>JavaScript Errors</strong> - Auto error tracking</li>
+      </ul>
+    </div>
+
+    <div class="container">
+      <h2>Status</h2>
+      <div class="status">
+        <strong>Queue Size:</strong> <span id="queueSize">0</span> events
+      </div>
+    </div>
+
+    <div class="container">
+      <h2>Test Auto Capture</h2>
+      <button onclick="alert('Button clicked!')">Click Me</button>
+      <button onclick="triggerError()">Trigger Error</button>
+      <button onclick="flushEvents()">Flush Events</button>
+    </div>
+
+    <!-- Load LoopKit SDK -->
+    <script src="../dist/loopkit.min.js"></script>
+
+    <script>
+      // 🎉 ZERO CONFIG INITIALIZATION
+      LoopKit.init('demo-api-key', {
+        debug: true,
+      });
+
+      function updateStatus() {
+        document.getElementById('queueSize').textContent =
+          LoopKit.getQueueSize();
+      }
+
+      function triggerError() {
+        throw new Error('Demo error for testing!');
+      }
+
+      function flushEvents() {
+        LoopKit.flush().then(() => {
+          alert('Events flushed!');
+          updateStatus();
+        });
+      }
+
+      // Update status periodically
+      setInterval(updateStatus, 2000);
+      setTimeout(updateStatus, 100);
+
+      console.log('🎉 LoopKit Zero Config Demo loaded!');
+    </script>
+  </body>
+</html>

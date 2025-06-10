@@ -1,6 +1,17 @@
 # LoopKit JavaScript SDK
 
-A JavaScript SDK for LoopKit analytics that works in both browser and Node.js environments.
+A complete analytics SDK for tracking events, user identification, and behavioral analytics in web applications. Now built with **TypeScript** for better developer experience and type safety.
+
+## Features
+
+- **🔧 TypeScript Support**: Full TypeScript support with comprehensive type definitions
+- **📊 Event Tracking**: Track custom events with properties
+- **👤 User Identification**: Identify users and track their journey
+- **👥 Group Analytics**: Associate users with organizations/groups
+- **🔄 Automatic Features**: Auto-click tracking, error tracking, session management
+- **💾 Local Storage**: Persist events offline with automatic retry
+- **🌐 Cross-Platform**: Works in browsers, Node.js, and React applications
+- **📦 Multiple Formats**: ES modules, CommonJS, UMD builds available
 
 ## 📖 Complete Documentation
 
@@ -60,11 +71,84 @@ LoopKit.track('user_signup', {
 });
 ```
 
+## TypeScript Support
+
+The SDK is built with TypeScript and exports comprehensive type definitions:
+
+### Core Types
+
+```typescript
+import type {
+  // Configuration
+  LoopKitConfig,
+  LogLevel,
+  RetryBackoff,
+
+  // Events
+  TrackEvent,
+  IdentifyEvent,
+  GroupEvent,
+  ClickEventProperties,
+  BatchEventInput,
+  TrackOptions,
+
+  // Interfaces
+  ILoopKit,
+  IStorageManager,
+  ISessionManager,
+  IQueueManager,
+  INetworkManager,
+
+  // Convenience aliases
+  Config,
+  Event,
+  Options,
+} from '@loopkit/javascript';
+```
+
+### Configuration Types
+
+```typescript
+const config: LoopKitConfig = {
+  apiKey: 'your-key',
+  baseURL: 'https://api.example.com',
+  batchSize: 50,
+  flushInterval: 30,
+  debug: true,
+  logLevel: 'info',
+  enableAutoClickTracking: true,
+  enableErrorTracking: true,
+  respectDoNotTrack: true,
+  onBeforeTrack: (event) => {
+    // Modify event before tracking
+    return { ...event, timestamp: new Date().toISOString() };
+  },
+  onAfterTrack: (event, success) => {
+    if (!success) {
+      console.warn('Failed to track event:', event);
+    }
+  },
+  onError: (error) => {
+    console.error('LoopKit error:', error);
+  },
+};
+```
+
 ## API Reference
+
+### API Endpoints
+
+The SDK sends events to separate, dedicated endpoints:
+
+- **Track Events**: `POST /tracks` with payload `{ tracks: [...] }`
+- **User Identification**: `POST /identities` with payload `{ identifies: [...] }`
+- **Group Association**: `POST /groups` with payload `{ groups: [...] }`
+
+Each endpoint receives an array of the respective event type wrapped in a named property. This allows for better API performance and easier backend processing.
 
 ### Initialization
 
-#### `LoopKit.init(apiKey, options?)`
+#### `LoopKit.init(apiKey, config?)`
 
 Initialize the SDK with your API key and optional configuration.
 
@@ -73,8 +157,9 @@ LoopKit.init('your-api-key', {
   debug: false,
   batchSize: 50,
   flushInterval: 30,
-  enableAutoCapture: false,
-  enableErrorTracking: false,
+  enableAutoCapture: true,
+  enableAutoClickTracking: true,
+  enableErrorTracking: true,
 });
 ```
 
@@ -154,6 +239,14 @@ const queueSize = LoopKit.getQueueSize();
 console.log(`${queueSize} events queued`);
 ```
 
+### LoopKit.reset()
+
+Reset the SDK state (useful for logout).
+
+```javascript
+LoopKit.reset();
+```
+
 ## Configuration Options
 
 ```javascript
@@ -174,9 +267,10 @@ LoopKit.configure({
   debug: false, // Enable debug logs
   logLevel: 'info', // 'error', 'warn', 'info', 'debug'
 
-  // Auto-capture (Browser only)
-  enableAutoCapture: false, // Auto-track page views
-  enableErrorTracking: false, // Auto-track JS errors
+  // Auto-capture (Browser only) - All enabled by default for zero-config setup
+  enableAutoCapture: true, // Auto-track page views
+  enableAutoClickTracking: true, // Auto-track click events
+  enableErrorTracking: true, // Auto-track JS errors
 
   // Privacy
   respectDoNotTrack: true, // Honor DNT header

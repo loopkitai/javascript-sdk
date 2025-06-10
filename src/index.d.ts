@@ -18,6 +18,7 @@ export interface LoopKitConfig {
 
   // Auto-capture
   enableAutoCapture?: boolean;
+  enableAutoClickTracking?: boolean;
   enableErrorTracking?: boolean;
 
   // Privacy
