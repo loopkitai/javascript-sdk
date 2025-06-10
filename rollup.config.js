@@ -2,6 +2,7 @@ const resolve = require('@rollup/plugin-node-resolve');
 const commonjs = require('@rollup/plugin-commonjs');
 const babel = require('@rollup/plugin-babel');
 const terser = require('@rollup/plugin-terser');
+const replace = require('@rollup/plugin-replace');
 const { readFileSync } = require('fs');
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
@@ -15,6 +16,10 @@ const banner = `/*!
 const baseConfig = {
   input: 'src/index.js',
   plugins: [
+    replace({
+      __VERSION__: JSON.stringify(pkg.version),
+      preventAssignment: true,
+    }),
     resolve(),
     commonjs(),
     babel.default({

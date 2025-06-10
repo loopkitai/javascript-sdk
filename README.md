@@ -237,6 +237,18 @@ npm run lint
 npm run format
 ```
 
+### Deploying
+
+```bash
+# 1. Increment version in package.json
+
+# 2. Deploy to CDN
+yarn deploy:cdn
+
+# 3. Publish to NPM
+npm publish --access public
+```
+
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.

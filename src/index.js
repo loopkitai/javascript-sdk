@@ -7,8 +7,8 @@
 
 class LoopKit {
   constructor() {
-    // SDK Version
-    this.version = '1.0.1';
+    // SDK Version automatically set by Rollup, update in package.json
+    this.version = __VERSION__; // eslint-disable-line no-undef
 
     // Core configuration
     this.config = {
@@ -27,12 +27,12 @@ class LoopKit {
 
       // Debugging
       debug: false,
-      logLevel: 'info',
+      logLevel: 'debug',
 
       // Auto-capture
-      enableAutoCapture: false,
-      enableAutoClickTracking: false,
-      enableErrorTracking: false,
+      enableAutoCapture: true,
+      enableAutoClickTracking: true,
+      enableErrorTracking: true,
 
       // Session Tracking
       enableSessionTracking: true,
@@ -56,6 +56,7 @@ class LoopKit {
     this.initialized = false;
     this.eventQueue = [];
     this.flushTimer = null;
+    this.flushTimerStartTime = null;
     this.userId = null;
     this.userProperties = {};
     this.groupId = null;
@@ -298,8 +299,9 @@ class LoopKit {
 
     const events = [...this.eventQueue];
     this.eventQueue = [];
+    const flushStartTime = Date.now();
 
-    this.log('debug', `Flushing ${events.length} events`);
+    this.log('debug', `Starting flush of ${events.length} events`);
 
     // Group events by type
     const eventsByType = {
@@ -321,6 +323,15 @@ class LoopKit {
       }
     });
 
+    if (this.config.debug) {
+      this.log('debug', 'Events grouped for batch sending', {
+        tracksCount: eventsByType.tracks.length,
+        identifiesCount: eventsByType.identifies.length,
+        groupsCount: eventsByType.groups.length,
+        totalEvents: events.length,
+      });
+    }
+
     try {
       // Send each event type to its respective endpoint
       const promises = [];
@@ -338,6 +349,21 @@ class LoopKit {
       }
 
       await Promise.all(promises);
+
+      const flushDuration = Date.now() - flushStartTime;
+
+      // Enhanced success logging
+      if (this.config.debug) {
+        this.log('debug', 'Batch flush completed successfully', {
+          eventsCount: events.length,
+          tracksCount: eventsByType.tracks.length,
+          identifiesCount: eventsByType.identifies.length,
+          groupsCount: eventsByType.groups.length,
+          flushDurationMs: flushDuration,
+          endpointsSent: promises.length,
+          queueSizeAfterFlush: this.eventQueue.length,
+        });
+      }
 
       // Clear persisted queue on successful flush
       if (this.config.enableLocalStorage) {
@@ -358,7 +384,23 @@ class LoopKit {
         });
       }
     } catch (error) {
-      this.log('error', 'Failed to flush events', error);
+      const flushDuration = Date.now() - flushStartTime;
+
+      // Enhanced failure logging
+      if (this.config.debug) {
+        this.log('error', 'Batch flush failed', {
+          eventsCount: events.length,
+          tracksCount: eventsByType.tracks.length,
+          identifiesCount: eventsByType.identifies.length,
+          groupsCount: eventsByType.groups.length,
+          flushDurationMs: flushDuration,
+          errorMessage: error.message,
+          errorType: error.constructor.name,
+          queueSizeAfterRequeue: this.eventQueue.length + events.length,
+        });
+      } else {
+        this.log('error', 'Failed to flush events', error);
+      }
 
       // Re-queue events on failure
       this.eventQueue.unshift(...events);
@@ -623,6 +665,52 @@ class LoopKit {
 
     this.eventQueue.push(event);
 
+    // Enhanced debug logging for queue events
+    if (this.config.debug) {
+      const queueSize = this.eventQueue.length;
+      const willAutoFlush = queueSize >= this.config.batchSize;
+
+      // Calculate time until next automatic flush
+      let timeUntilNextFlush = null;
+      if (!willAutoFlush && this.config.flushInterval > 0) {
+        // Calculate time since last flush timer start
+        const now = Date.now();
+        if (this.flushTimerStartTime) {
+          const elapsedSinceTimerStart = now - this.flushTimerStartTime;
+          const flushIntervalMs = this.config.flushInterval * 1000;
+          timeUntilNextFlush = Math.max(
+            0,
+            flushIntervalMs - (elapsedSinceTimerStart % flushIntervalMs)
+          );
+        } else {
+          timeUntilNextFlush = this.config.flushInterval * 1000;
+        }
+      }
+
+      const debugInfo = {
+        eventType: event.name
+          ? 'track'
+          : event.userId && !event.groupId
+            ? 'identify'
+            : 'group',
+        eventName:
+          event.name || (event.userId && !event.groupId ? 'identify' : 'group'),
+        queueSize,
+        batchSize: this.config.batchSize,
+        willAutoFlush,
+        timeUntilNextFlushMs: timeUntilNextFlush,
+        timeUntilNextFlushSeconds: timeUntilNextFlush
+          ? Math.round(timeUntilNextFlush / 1000)
+          : null,
+      };
+
+      this.log(
+        'debug',
+        `Event added to queue${willAutoFlush ? ' - triggering immediate flush' : ''}`,
+        debugInfo
+      );
+    }
+
     // Persist queue if enabled - but don't let it block event queuing
     if (this.config.enableLocalStorage) {
       try {
@@ -646,6 +734,7 @@ class LoopKit {
    */
   async sendEvents(endpoint, events, retryCount = 0) {
     const url = `${this.config.baseURL}/${endpoint}?apiKey=${encodeURIComponent(this.config.apiKey)}`;
+    const sendStartTime = Date.now();
 
     // Create payload based on endpoint type
     let payload;
@@ -664,6 +753,20 @@ class LoopKit {
       'Content-Type': 'application/json',
     };
 
+    if (this.config.debug) {
+      this.log(
+        'debug',
+        `Sending ${events.length} events to ${endpoint} endpoint${retryCount > 0 ? ` (retry ${retryCount})` : ''}`,
+        {
+          endpoint,
+          eventsCount: events.length,
+          retryAttempt: retryCount,
+          url: url.replace(/apiKey=[^&]+/, 'apiKey=***'),
+          payloadSize: JSON.stringify(payload).length,
+        }
+      );
+    }
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(
@@ -679,6 +782,7 @@ class LoopKit {
       });
 
       clearTimeout(timeoutId);
+      const sendDuration = Date.now() - sendStartTime;
 
       // Check if response exists and has ok property
       if (!response || !response.ok) {
@@ -687,21 +791,63 @@ class LoopKit {
         throw new Error(status ? `HTTP ${status}: ${statusText}` : statusText);
       }
 
-      this.log(
-        'debug',
-        `Successfully sent ${events.length} ${endpoint} events`
-      );
+      if (this.config.debug) {
+        this.log(
+          'debug',
+          `Successfully sent ${events.length} ${endpoint} events`,
+          {
+            endpoint,
+            eventsCount: events.length,
+            sendDurationMs: sendDuration,
+            responseStatus: response.status,
+            retryAttempt: retryCount,
+          }
+        );
+      } else {
+        this.log(
+          'debug',
+          `Successfully sent ${events.length} ${endpoint} events`
+        );
+      }
     } catch (error) {
-      this.log(
-        'error',
-        `Failed to send ${endpoint} events (attempt ${retryCount + 1})`,
-        error
-      );
+      const sendDuration = Date.now() - sendStartTime;
+
+      if (this.config.debug) {
+        this.log(
+          'error',
+          `Failed to send ${endpoint} events (attempt ${retryCount + 1})`,
+          {
+            endpoint,
+            eventsCount: events.length,
+            sendDurationMs: sendDuration,
+            retryAttempt: retryCount + 1,
+            maxRetries: this.config.maxRetries,
+            errorMessage: error.message,
+            errorType: error.constructor.name,
+          }
+        );
+      } else {
+        this.log(
+          'error',
+          `Failed to send ${endpoint} events (attempt ${retryCount + 1})`,
+          error
+        );
+      }
 
       // Retry logic
       if (retryCount < this.config.maxRetries) {
         const delay = this.calculateRetryDelay(retryCount);
-        this.log('debug', `Retrying in ${delay}ms`);
+
+        if (this.config.debug) {
+          this.log('debug', `Retrying ${endpoint} endpoint in ${delay}ms`, {
+            endpoint,
+            retryDelay: delay,
+            nextRetryAttempt: retryCount + 2,
+            maxRetries: this.config.maxRetries,
+          });
+        } else {
+          this.log('debug', `Retrying in ${delay}ms`);
+        }
 
         await new Promise((resolve) => setTimeout(resolve, delay));
         return this.sendEvents(endpoint, events, retryCount + 1);
@@ -739,6 +885,8 @@ class LoopKit {
         }
       }, this.config.flushInterval * 1000);
     }
+
+    this.flushTimerStartTime = Date.now();
   }
 
   /**
@@ -838,36 +986,104 @@ class LoopKit {
       return; // Not in browser environment
     }
 
+    // Store current page info that gets updated on page changes
+    let currentPageInfo = {
+      pathname: window.location.pathname,
+      title: document.title,
+      href: window.location.href,
+    };
+
+    // Update page info on navigation events
+    const updatePageInfo = () => {
+      currentPageInfo = {
+        pathname: window.location.pathname,
+        title: document.title,
+        href: window.location.href,
+      };
+    };
+
+    // Listen for page changes to keep our cached page info current
+    window.addEventListener('popstate', updatePageInfo);
+    window.addEventListener('pushstate', updatePageInfo);
+    window.addEventListener('replacestate', updatePageInfo);
+
+    // Use capture phase to run before other click handlers and navigation
     document.addEventListener(
       'click',
       (event) => {
         try {
-          const element = event.target;
-          const clickableInfo = this.getClickableElementInfo(element);
+          // Use pre-captured page information to ensure we get the source page
+          const sourcePage = currentPageInfo.pathname;
+          const sourcePageTitle = currentPageInfo.title;
+          const sourcePageUrl = currentPageInfo.href;
+
+          // Immediately update our cached info in case this click causes navigation
+          updatePageInfo();
+
+          // Start with the direct target and traverse up to find clickable elements
+          let element = event.target;
+          let clickableInfo = null;
+
+          // Traverse up the DOM tree to find a clickable element (max 5 levels up)
+          let traversalDepth = 0;
+          const maxTraversalDepth = 5;
+
+          while (
+            element &&
+            element.tagName &&
+            traversalDepth < maxTraversalDepth
+          ) {
+            clickableInfo = this.getClickableElementInfo(element);
+            if (clickableInfo) {
+              break; // Found a clickable element
+            }
+            element = element.parentElement;
+            traversalDepth++;
+          }
 
           if (clickableInfo) {
-            this.track('element_click', {
+            const eventProperties = {
               element_type: clickableInfo.type,
               element_text: clickableInfo.text,
               element_id: clickableInfo.id,
               element_class: clickableInfo.className,
               element_tag: clickableInfo.tag,
-              page: window.location.pathname,
-              page_title: document.title,
+              page: sourcePage, // Use pre-captured source page
+              page_title: sourcePageTitle, // Use pre-captured source title
+              page_url: sourcePageUrl, // Use pre-captured source URL
               position: {
                 x: event.clientX,
                 y: event.clientY,
               },
-            });
+            };
+
+            // Add href if the element has one
+            if (clickableInfo.href) {
+              eventProperties.element_href = clickableInfo.href;
+            }
+
+            // Add aria-label if the element has one
+            if (clickableInfo.ariaLabel) {
+              eventProperties.element_aria_label = clickableInfo.ariaLabel;
+            }
+
+            // Add traversal info for debugging if we had to traverse up
+            if (this.config.debug && traversalDepth > 0) {
+              eventProperties.traversal_depth = traversalDepth;
+              eventProperties.original_target_tag =
+                event.target.tagName.toLowerCase();
+            }
+
+            this.track('element_click', eventProperties);
           }
         } catch (error) {
           this.log('warn', 'Error in auto click tracking', error);
         }
       },
-      { passive: true }
+      { capture: true, passive: true } // Use capture phase to run before navigation
     );
 
-    this.log('debug', 'Auto click tracking enabled');
+    this.log('debug', 'Auto click tracking enabled with capture phase');
   }
 
   /**
@@ -914,13 +1130,39 @@ class LoopKit {
       type = 'link';
     }
 
-    return {
+    // Get href if element is a link or has href attribute
+    let href = null;
+    if (element.href) {
+      href = element.href;
+    } else if (element.getAttribute && element.getAttribute('href')) {
+      href = element.getAttribute('href');
+    }
+
+    // Get aria-label if element has one
+    let ariaLabel = null;
+    if (element.getAttribute && element.getAttribute('aria-label')) {
+      ariaLabel = element.getAttribute('aria-label').trim();
+    }
+
+    const result = {
       type,
       text,
       id: element.id || null,
       className: element.className || null,
       tag: tagName,
     };
+
+    // Add href to result if it exists
+    if (href) {
+      result.href = href;
+    }
+
+    // Add aria-label to result if it exists
+    if (ariaLabel) {
+      result.ariaLabel = ariaLabel;
+    }
+
+    return result;
   }
 
   /**
@@ -1227,6 +1469,7 @@ class LoopKit {
     const configLevel = levels.indexOf(this.config.logLevel);
     const messageLevel = levels.indexOf(level);
 
+    // Show messages with priority >= configured level (lower index = higher priority)
     if (messageLevel <= configLevel) {
       const now = new Date();
       const fullTimestamp = `${now.toLocaleDateString()} ${now.toLocaleTimeString()}.${now.getMilliseconds().toString().padStart(3, '0')}`;
