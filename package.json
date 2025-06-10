@@ -1,6 +1,6 @@
 {
     "name": "@loopkit/javascript",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "description": "LoopKit JavaScript SDK for tracking events and user analytics",
     "main": "dist/loopkit.js",
     "module": "dist/loopkit.esm.js",
@@ -17,7 +17,9 @@
         "lint": "eslint src/**/*.js",
         "format": "prettier --write src/**/*.js",
         "prepare": "npm run build",
-        "deploy:cdn": "./deploy.sh"
+        "deploy:cdn": "./deploy.sh",
+        "publish": "npm publish --access public",
+        "deploy:prod": "npm run build && npm run deploy:cdn && npm run publish --access public"
     },
     "keywords": [
         "analytics",
@@ -44,10 +46,10 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/loopkit/javascript-sdk.git"
+        "url": "git+https://github.com/loopkitai/javascript-sdk.git"
     },
     "bugs": {
-        "url": "https://github.com/loopkit/javascript-sdk/issues"
+        "url": "https://github.com/loopkitai/javascript-sdk/issues"
     },
-    "homepage": "https://github.com/loopkit/javascript-sdk#readme"
+    "homepage": "https://github.com/loopkitai/javascript-sdk#readme"
 }

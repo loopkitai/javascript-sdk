@@ -658,11 +658,6 @@ class LoopKit {
       throw new Error(`Invalid endpoint: ${endpoint}`);
     }
 
-    // add "type": "fetch" to all track events properties TODO
-    payload.tracks.forEach((track) => {
-      track.properties.type = 'fetch';
-    });
-
     const headers = {
       'Content-Type': 'application/json',
     };
