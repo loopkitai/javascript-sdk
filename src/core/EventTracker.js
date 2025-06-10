@@ -120,15 +120,12 @@ export class EventTracker {
    */
   createEvent(type, data, context = {}) {
     const baseEvent = {
-      id: this.idGenerator.generateEventId(),
-      timestamp: Date.now(),
       anonymousId: this.sessionManager.getAnonymousId(),
-      page: {
-        path: typeof window !== 'undefined' ? window.location.pathname : null,
-        url: typeof window !== 'undefined' ? window.location.href : null,
-        title: typeof document !== 'undefined' ? document.title : null,
-        referrer: typeof document !== 'undefined' ? document.referrer : null,
-      },
+      timestamp: new Date().toISOString(), // ISO 8601 format as required by API
+    };
+
+    // Create system object with nested properties as expected by API
+    const system = {
       sdk: {
         name: '@loopkit/javascript',
         version: typeof __VERSION__ !== 'undefined' ? __VERSION__ : '1.0.4', // eslint-disable-line no-undef
@@ -136,9 +133,16 @@ export class EventTracker {
       sessionId: this.sessionManager.getSessionId(),
     };
 
-    // Add additional context if in browser
+    // Add browser context if available
     if (typeof window !== 'undefined') {
-      baseEvent.context = {
+      system.context = {
+        page: {
+          url: window.location.href,
+          path: window.location.pathname,
+          search: window.location.search,
+          title: document.title,
+          referrer: document.referrer,
+        },
         userAgent: navigator.userAgent,
         screen: {
           width: window.screen.width,
@@ -158,12 +162,14 @@ export class EventTracker {
         userId: context.userId,
         name: data.name,
         properties: data.properties,
+        system,
       };
     } else if (type === 'identify') {
       return {
         ...baseEvent,
         userId: data.userId,
         properties: data.properties,
+        system,
       };
     } else if (type === 'group') {
       return {
@@ -172,6 +178,7 @@ export class EventTracker {
         groupId: data.groupId,
         groupType: data.groupType,
         properties: data.properties,
+        system,
       };
     }
 
@@ -180,6 +187,7 @@ export class EventTracker {
       ...baseEvent,
       type,
       ...data,
+      system,
     };
   }
 }

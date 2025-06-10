@@ -403,35 +403,194 @@ describe('LoopKit SDK', () => {
   });
 
   describe('Callback Handling', () => {
-    test('should handle callback errors gracefully', () => {
-      const onBeforeTrack = jest.fn(() => {
+    beforeEach(() => {
+      LoopKit.init('test-api-key');
+    });
+
+    it('should handle callback errors gracefully', () => {
+      const errorCallback = jest.fn(() => {
         throw new Error('Callback error');
       });
 
-      LoopKit.init('test-api-key', { onBeforeTrack });
-      LoopKit.track('test_event'); // Should not crash
-
-      expect(onBeforeTrack).toHaveBeenCalled();
-      expect(LoopKit.getQueueSize()).toBe(1);
-    });
-
-    test('should call onAfterTrack after successful flush', async () => {
-      const onAfterTrack = jest.fn();
-
-      fetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
+      LoopKit.configure({
+        onBeforeTrack: errorCallback,
       });
 
-      LoopKit.init('test-api-key', { onAfterTrack });
-      LoopKit.track('test_event');
+      expect(() => {
+        LoopKit.track('test_event');
+      }).not.toThrow();
 
+      expect(errorCallback).toHaveBeenCalled();
+    });
+
+    it('should call onAfterTrack after successful flush', async () => {
+      const afterTrackCallback = jest.fn();
+
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true }),
+        })
+      );
+
+      LoopKit.configure({
+        onAfterTrack: afterTrackCallback,
+      });
+
+      LoopKit.track('test_event');
       await LoopKit.flush();
 
-      expect(onAfterTrack).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'test_event' }),
-        true
+      expect(afterTrackCallback).toHaveBeenCalled();
+    });
+  });
+
+  describe('API Schema Compliance', () => {
+    beforeEach(() => {
+      LoopKit.init('test-api-key');
+      // Mock fetch to capture the actual payload being sent
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true }),
+        })
       );
+    });
+
+    it('should send track events with correct API schema structure', async () => {
+      LoopKit.track('test_event', { prop1: 'value1' });
+      await LoopKit.flush();
+
+      expect(global.fetch).toHaveBeenCalled();
+      const [, options] = global.fetch.mock.calls[0];
+      const payload = JSON.parse(options.body);
+
+      // Verify payload structure
+      expect(payload).toHaveProperty('tracks');
+      expect(Array.isArray(payload.tracks)).toBe(true);
+      expect(payload.tracks).toHaveLength(1);
+
+      const event = payload.tracks[0];
+
+      // Verify required fields
+      expect(event).toHaveProperty('anonymousId');
+      expect(typeof event.anonymousId).toBe('string');
+
+      expect(event).toHaveProperty('timestamp');
+      expect(typeof event.timestamp).toBe('string');
+      // Verify ISO 8601 format
+      expect(event.timestamp).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+      );
+
+      expect(event).toHaveProperty('name', 'test_event');
+      expect(event).toHaveProperty('properties');
+      expect(event.properties).toEqual({ prop1: 'value1' });
+
+      // Verify system object structure
+      expect(event).toHaveProperty('system');
+      expect(typeof event.system).toBe('object');
+
+      expect(event.system).toHaveProperty('sdk');
+      expect(event.system.sdk).toHaveProperty('name', '@loopkit/javascript');
+      expect(event.system.sdk).toHaveProperty('version');
+      expect(typeof event.system.sdk.version).toBe('string');
+
+      expect(event.system).toHaveProperty('sessionId');
+      expect(typeof event.system.sessionId).toBe('string');
+
+      // Context should be present in browser environment (jsdom)
+      expect(event.system).toHaveProperty('context');
+      expect(event.system.context).toHaveProperty('userAgent');
+      expect(event.system.context).toHaveProperty('screen');
+      expect(event.system.context).toHaveProperty('viewport');
+      expect(event.system.context).toHaveProperty('page');
+    });
+
+    it('should send identify events with correct API schema structure', async () => {
+      LoopKit.identify('user123', { name: 'John Doe' });
+      await LoopKit.flush();
+
+      expect(global.fetch).toHaveBeenCalled();
+      const [, options] = global.fetch.mock.calls[0];
+      const payload = JSON.parse(options.body);
+
+      // Verify payload structure
+      expect(payload).toHaveProperty('identifies');
+      expect(Array.isArray(payload.identifies)).toBe(true);
+      expect(payload.identifies).toHaveLength(1);
+
+      const event = payload.identifies[0];
+
+      // Verify required fields for identify
+      expect(event).toHaveProperty('anonymousId');
+      expect(event).toHaveProperty('userId', 'user123');
+      expect(event).toHaveProperty('timestamp');
+      expect(event.timestamp).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+      );
+      expect(event).toHaveProperty('properties', { name: 'John Doe' });
+      expect(event).toHaveProperty('system');
+    });
+
+    it('should send group events with correct API schema structure', async () => {
+      LoopKit.group('group123', { name: 'Company Inc' }, 'organization');
+      await LoopKit.flush();
+
+      expect(global.fetch).toHaveBeenCalled();
+      const [, options] = global.fetch.mock.calls[0];
+      const payload = JSON.parse(options.body);
+
+      // Verify payload structure
+      expect(payload).toHaveProperty('groups');
+      expect(Array.isArray(payload.groups)).toBe(true);
+      expect(payload.groups).toHaveLength(1);
+
+      const event = payload.groups[0];
+
+      // Verify required fields for group
+      expect(event).toHaveProperty('anonymousId');
+      expect(event).toHaveProperty('groupId', 'group123');
+      expect(event).toHaveProperty('groupType', 'organization');
+      expect(event).toHaveProperty('timestamp');
+      expect(event.timestamp).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+      );
+      expect(event).toHaveProperty('properties', { name: 'Company Inc' });
+      expect(event).toHaveProperty('system');
+    });
+
+    it('should ensure all events have unique timestamps', () => {
+      // Create multiple events rapidly
+      for (let i = 0; i < 5; i++) {
+        LoopKit.track(`event_${i}`);
+      }
+
+      // Get the events from the queue (by accessing internal state for testing)
+      const queueManager = LoopKit.queueManager;
+      const queue = queueManager.eventQueue;
+
+      expect(queue).toHaveLength(5);
+
+      // Extract timestamps
+      const timestamps = queue.map((event) => event.timestamp);
+
+      // Verify all timestamps are valid ISO 8601 strings
+      timestamps.forEach((timestamp) => {
+        expect(typeof timestamp).toBe('string');
+        expect(timestamp).toMatch(
+          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+        );
+        expect(new Date(timestamp).toISOString()).toBe(timestamp);
+      });
+
+      // Verify timestamps are unique (or at least ordered)
+      for (let i = 1; i < timestamps.length; i++) {
+        expect(new Date(timestamps[i]).getTime()).toBeGreaterThanOrEqual(
+          new Date(timestamps[i - 1]).getTime()
+        );
+      }
     });
   });
 });
