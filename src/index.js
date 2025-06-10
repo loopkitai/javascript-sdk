@@ -31,6 +31,7 @@ class LoopKit {
 
       // Auto-capture
       enableAutoCapture: false,
+      enableAutoClickTracking: false,
       enableErrorTracking: false,
 
       // Session Tracking
@@ -489,6 +490,7 @@ class LoopKit {
 
       // Auto-capture
       enableAutoCapture: false,
+      enableAutoClickTracking: false,
       enableErrorTracking: false,
 
       // Session Tracking
@@ -748,6 +750,11 @@ class LoopKit {
       this.setupAutoPageViews();
     }
 
+    // Auto click tracking
+    if (this.config.enableAutoClickTracking) {
+      this.setupAutoClickTracking();
+    }
+
     // Auto error tracking
     if (this.config.enableErrorTracking) {
       this.setupErrorTracking();
@@ -821,6 +828,151 @@ class LoopKit {
         stack: event.reason?.stack,
       });
     });
+  }
+
+  /**
+   * Setup automatic click tracking for buttons and interactive elements
+   */
+  setupAutoClickTracking() {
+    if (typeof document === 'undefined') {
+      return; // Not in browser environment
+    }
+
+    document.addEventListener(
+      'click',
+      (event) => {
+        try {
+          const element = event.target;
+          const clickableInfo = this.getClickableElementInfo(element);
+
+          if (clickableInfo) {
+            this.track('element_click', {
+              element_type: clickableInfo.type,
+              element_text: clickableInfo.text,
+              element_id: clickableInfo.id,
+              element_class: clickableInfo.className,
+              element_tag: clickableInfo.tag,
+              page: window.location.pathname,
+              page_title: document.title,
+              position: {
+                x: event.clientX,
+                y: event.clientY,
+              },
+            });
+          }
+        } catch (error) {
+          this.log('warn', 'Error in auto click tracking', error);
+        }
+      },
+      { passive: true }
+    );
+
+    this.log('debug', 'Auto click tracking enabled');
+  }
+
+  /**
+   * Extract information from clickable elements
+   */
+  getClickableElementInfo(element) {
+    if (!element || !element.tagName) {
+      return null;
+    }
+
+    const tagName = element.tagName.toLowerCase();
+    const isClickable = this.isClickableElement(element);
+
+    if (!isClickable) {
+      return null;
+    }
+
+    // Get element text content
+    let text = '';
+    if (element.innerText) {
+      text = element.innerText.trim();
+    } else if (element.textContent) {
+      text = element.textContent.trim();
+    } else if (element.value) {
+      text = element.value.trim();
+    } else if (element.alt) {
+      text = element.alt.trim();
+    } else if (element.title) {
+      text = element.title.trim();
+    }
+
+    // Limit text length to avoid extremely long strings
+    if (text.length > 100) {
+      text = text.substring(0, 97) + '...';
+    }
+
+    // Determine element type
+    let type = tagName;
+    if (tagName === 'input') {
+      type = element.type || 'input';
+    } else if (tagName === 'button') {
+      type = element.type === 'submit' ? 'submit_button' : 'button';
+    } else if (tagName === 'a') {
+      type = 'link';
+    }
+
+    return {
+      type,
+      text,
+      id: element.id || null,
+      className: element.className || null,
+      tag: tagName,
+    };
+  }
+
+  /**
+   * Check if an element is clickable and should be tracked
+   */
+  isClickableElement(element) {
+    const tagName = element.tagName.toLowerCase();
+
+    // Direct clickable elements
+    const clickableTags = ['button', 'a', 'input', 'select', 'textarea'];
+    if (clickableTags.includes(tagName)) {
+      return true;
+    }
+
+    // Elements with click handlers or specific roles
+    if (
+      element.onclick ||
+      element.getAttribute('role') === 'button' ||
+      element.getAttribute('role') === 'link' ||
+      element.getAttribute('tabindex') !== null ||
+      element.style.cursor === 'pointer'
+    ) {
+      return true;
+    }
+
+    // Elements with common interactive classes
+    const className = element.className || '';
+    const interactiveClasses = [
+      'btn',
+      'button',
+      'link',
+      'clickable',
+      'interactive',
+    ];
+    if (
+      interactiveClasses.some((cls) => className.toLowerCase().includes(cls))
+    ) {
+      return true;
+    }
+
+    // Check if element has click event listeners (limited detection)
+    if (
+      element.hasAttribute('data-click') ||
+      element.hasAttribute('data-action') ||
+      element.hasAttribute('ng-click') ||
+      element.hasAttribute('@click') ||
+      element.hasAttribute('v-on:click')
+    ) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
