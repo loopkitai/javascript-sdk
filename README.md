@@ -8,7 +8,7 @@ A complete analytics SDK for tracking events, user identification, and behaviora
 - **📊 Event Tracking**: Track custom events with properties
 - **👤 User Identification**: Identify users and track their journey
 - **👥 Group Analytics**: Associate users with organizations/groups
-- **🔄 Automatic Features**: Auto-click tracking, error tracking, session management
+- **🔄 Zero-Config Auto Tracking**: Automatic page views, clicks, and error tracking (enabled by default)
 - **💾 Local Storage**: Persist events offline with automatic retry
 - **🌐 Cross-Platform**: Works in browsers, Node.js, and React applications
 - **📦 Multiple Formats**: ES modules, CommonJS, UMD builds available
@@ -36,10 +36,11 @@ npm install @loopkit/javascript
 ```javascript
 import LoopKit from '@loopkit/javascript';
 
-// Initialize
+// Initialize - auto tracking starts immediately!
 LoopKit.init('your-api-key-here');
+// ✅ automatically tracking page views, clicks, and errors
 
-// Track an event
+// Track custom events manually
 LoopKit.track('button_clicked', {
   button_name: 'signup',
   page: '/homepage',
@@ -68,6 +69,67 @@ LoopKit.init('your-api-key-here', {
 LoopKit.track('user_signup', {
   method: 'email',
   source: 'landing_page',
+});
+```
+
+## Auto Tracking Features (Enabled by Default)
+
+LoopKit automatically tracks common user interactions and events out of the box. **All auto tracking features are enabled by default** for zero-configuration setup:
+
+### 📋 Quick Reference
+
+| Feature                   | Default   | Event Type  | Description                      |
+| ------------------------- | --------- | ----------- | -------------------------------- |
+| `enableAutoCapture`       | ✅ `true` | `page_view` | Page loads and navigation        |
+| `enableAutoClickTracking` | ✅ `true` | `click`     | Button, link, and element clicks |
+| `enableErrorTracking`     | ✅ `true` | `error`     | JavaScript errors and exceptions |
+
+### 📊 **Page View Tracking** (`enableAutoCapture: true`)
+
+- **What it tracks**: Automatically captures page views on initial load and navigation
+- **Events generated**: `page_view` events with URL, path, title, and referrer
+- **When it triggers**:
+  - Initial page load
+  - Browser navigation (back/forward buttons)
+  - Single Page App (SPA) route changes
+- **Event properties**: `url`, `path`, `search`, `title`, `referrer`
+
+### 🖱️ **Click Tracking** (`enableAutoClickTracking: true`)
+
+- **What it tracks**: Automatically captures clicks on interactive elements
+- **Events generated**: `click` events with element details and page context
+- **Elements tracked**: Buttons, links, form inputs, and clickable elements
+- **Event properties**: `element_type`, `element_text`, `element_id`, `element_class`, `element_tag`, `element_href`, `page`, `page_title`, `page_url`, `position`
+
+### 🚨 **Error Tracking** (`enableErrorTracking: true`)
+
+- **What it tracks**: Automatically captures JavaScript errors and exceptions
+- **Events generated**: `error` events with error details and stack traces
+- **Error types**: Runtime errors, syntax errors, and unhandled promise rejections
+- **Event properties**: `message`, `filename`, `lineno`, `colno`, `stack`, `timestamp`
+
+### Zero-Config Example
+
+```javascript
+// Just initialize with your API key - auto tracking starts immediately!
+LoopKit.init('your-api-key');
+
+// The SDK will now automatically track:
+// ✅ Page views when users navigate
+// ✅ Clicks on buttons, links, etc.
+// ✅ JavaScript errors that occur
+// ✅ Session management
+```
+
+### Customizing Auto Tracking
+
+You can disable specific auto tracking features if needed:
+
+```javascript
+LoopKit.init('your-api-key', {
+  enableAutoCapture: false, // Disable page view tracking
+  enableAutoClickTracking: false, // Disable click tracking
+  enableErrorTracking: false, // Disable error tracking
 });
 ```
 
@@ -116,8 +178,12 @@ const config: LoopKitConfig = {
   flushInterval: 30,
   debug: true,
   logLevel: 'info',
-  enableAutoClickTracking: true,
-  enableErrorTracking: true,
+
+  // Auto tracking (all enabled by default)
+  enableAutoCapture: true, // Page view tracking
+  enableAutoClickTracking: true, // Click tracking
+  enableErrorTracking: true, // Error tracking
+
   respectDoNotTrack: true,
   onBeforeTrack: (event) => {
     // Modify event before tracking
@@ -157,9 +223,11 @@ LoopKit.init('your-api-key', {
   debug: false,
   batchSize: 50,
   flushInterval: 30,
-  enableAutoCapture: true,
-  enableAutoClickTracking: true,
-  enableErrorTracking: true,
+
+  // Auto tracking features (enabled by default - shown here for reference)
+  enableAutoCapture: true, // Auto page view tracking
+  enableAutoClickTracking: true, // Auto click tracking
+  enableErrorTracking: true, // Auto error tracking
 });
 ```
 
