@@ -29,7 +29,7 @@ export class LoopKit implements ILoopKit {
     apiKey: '',
     baseURL: 'https://drain.loopkit.ai/v1',
     batchSize: 50,
-    flushInterval: 30,
+    flushInterval: 5,
     maxQueueSize: 1000,
     enableCompression: true,
     requestTimeout: 10000,
