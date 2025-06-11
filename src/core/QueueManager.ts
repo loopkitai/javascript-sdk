@@ -133,7 +133,7 @@ export class QueueManager implements IQueueManager {
       }
 
       if (identifies.length > 0) {
-        const endpoint = `${this.config.baseURL}/identities`;
+        const endpoint = `${this.config.baseURL}/identifies`;
         const payload = { identifies };
         promises.push(networkManager.sendEvents(endpoint, payload));
       }

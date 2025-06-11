@@ -192,7 +192,7 @@ export class BrowserFeatures implements IBrowserFeatures {
             }
 
             if (identifies.length > 0) {
-              const endpoint = `${this.config.baseURL}/identities`;
+              const endpoint = `${this.config.baseURL}/identifies`;
               const payload = { identifies };
               this.networkManager.sendBeacon(endpoint, payload);
             }

@@ -207,7 +207,7 @@ const config: LoopKitConfig = {
 The SDK sends events to separate, dedicated endpoints:
 
 - **Track Events**: `POST /tracks` with payload `{ tracks: [...] }`
-- **User Identification**: `POST /identities` with payload `{ identifies: [...] }`
+- **User Identification**: `POST /identifies` with payload `{ identifies: [...] }`
 - **Group Association**: `POST /groups` with payload `{ groups: [...] }`
 
 Each endpoint receives an array of the respective event type wrapped in a named property. This allows for better API performance and easier backend processing.
