@@ -78,11 +78,12 @@ LoopKit automatically tracks common user interactions and events out of the box.
 
 ### 📋 Quick Reference
 
-| Feature                   | Default   | Event Type  | Description                      |
-| ------------------------- | --------- | ----------- | -------------------------------- |
-| `enableAutoCapture`       | ✅ `true` | `page_view` | Page loads and navigation        |
-| `enableAutoClickTracking` | ✅ `true` | `click`     | Button, link, and element clicks |
-| `enableErrorTracking`     | ✅ `true` | `error`     | JavaScript errors and exceptions |
+| Feature                   | Default   | Event Type                     | Description                      |
+| ------------------------- | --------- | ------------------------------ | -------------------------------- |
+| `enableAutoCapture`       | ✅ `true` | `page_view`                    | Page loads and navigation        |
+| `enableAutoClickTracking` | ✅ `true` | `click`                        | Button, link, and element clicks |
+| `enableErrorTracking`     | ✅ `true` | `error`                        | JavaScript errors and exceptions |
+| `enableSessionTracking`   | ✅ `true` | `session_start`, `session_end` | User session lifecycle tracking  |
 
 ### 📊 **Page View Tracking** (`enableAutoCapture: true`)
 
@@ -108,6 +109,18 @@ LoopKit automatically tracks common user interactions and events out of the box.
 - **Error types**: Runtime errors, syntax errors, and unhandled promise rejections
 - **Event properties**: `message`, `filename`, `lineno`, `colno`, `stack`, `timestamp`
 
+### 🔄 **Session Tracking** (`enableSessionTracking: true`)
+
+- **What it tracks**: Automatically captures user session lifecycle events
+- **Events generated**: `session_start` and `session_end` events with session metadata
+- **When it triggers**:
+  - `session_start`: When SDK initializes, after session timeout, or after reset
+  - `session_end`: Before session timeout, when SDK is reset, or on page unload
+- **Session timeout**: 30 minutes of inactivity (configurable via `sessionTimeout`)
+- **Event properties**:
+  - `session_start`: `sessionId`, `previousSessionId` (if continuing from another session)
+  - `session_end`: `sessionId`, `duration` (in seconds), `reason` (timeout, reset, unload)
+
 ### Zero-Config Example
 
 ```javascript
@@ -118,6 +131,7 @@ LoopKit.init('your-api-key');
 // ✅ Page views when users navigate
 // ✅ Clicks on buttons, links, etc.
 // ✅ JavaScript errors that occur
+// ✅ Session start/end events
 // ✅ Session management
 ```
 
@@ -130,6 +144,8 @@ LoopKit.init('your-api-key', {
   enableAutoCapture: false, // Disable page view tracking
   enableAutoClickTracking: false, // Disable click tracking
   enableErrorTracking: false, // Disable error tracking
+  enableSessionTracking: false, // Disable session tracking
+  sessionTimeout: 60 * 60, // Custom session timeout (1 hour, in seconds)
 });
 ```
 
@@ -183,6 +199,8 @@ const config: LoopKitConfig = {
   enableAutoCapture: true, // Page view tracking
   enableAutoClickTracking: true, // Click tracking
   enableErrorTracking: true, // Error tracking
+  enableSessionTracking: true, // Auto session tracking
+  sessionTimeout: 30 * 60, // Session timeout in seconds (30 minutes)
 
   respectDoNotTrack: true,
   onBeforeTrack: (event) => {
@@ -228,6 +246,22 @@ LoopKit.init('your-api-key', {
   enableAutoCapture: true, // Auto page view tracking
   enableAutoClickTracking: true, // Auto click tracking
   enableErrorTracking: true, // Auto error tracking
+  enableSessionTracking: true, // Auto session tracking
+  sessionTimeout: 30 * 60, // Session timeout in seconds (30 minutes)
+
+  respectDoNotTrack: true,
+  onBeforeTrack: (event) => {
+    // Modify event before tracking
+    return event;
+  },
+  onAfterTrack: (event, success) => {
+    // Handle tracking result
+    console.log(`Event ${event.name} ${success ? 'sent' : 'failed'}`);
+  },
+  onError: (error) => {
+    // Handle errors
+    console.error('LoopKit error:', error);
+  },
 });
 ```
 
@@ -339,6 +373,8 @@ LoopKit.configure({
   enableAutoCapture: true, // Auto-track page views
   enableAutoClickTracking: true, // Auto-track click events
   enableErrorTracking: true, // Auto-track JS errors
+  enableSessionTracking: true, // Auto-track session start/end
+  sessionTimeout: 30 * 60, // Session timeout in seconds (30 minutes)
 
   // Privacy
   respectDoNotTrack: true, // Honor DNT header

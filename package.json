@@ -1,6 +1,6 @@
 {
     "name": "@loopkit/javascript",
-    "version": "1.1.2",
+    "version": "1.1.4",
     "description": "JavaScript SDK for LoopKit analytics platform",
     "type": "module",
     "main": "dist/loopkit.cjs.js",

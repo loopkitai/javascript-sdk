@@ -126,6 +126,23 @@ export class LoopKit implements ILoopKit {
     this.queueManager.setNetworkManager(this.networkManager);
     this.queueManager.scheduleFlush();
 
+    // Setup session event tracking callback
+    this.sessionManager.setSessionEventCallback(
+      (eventName: string, properties: Record<string, any>) => {
+        this.eventTracker.track(
+          eventName,
+          properties,
+          {},
+          {
+            userId: this.userId,
+            userProperties: this.userProperties,
+            groupId: this.groupId,
+            groupProperties: this.groupProperties,
+          }
+        );
+      }
+    );
+
     if (this.browserFeatures) {
       this.browserFeatures.setNetworkManager(this.networkManager);
       this.browserFeatures.setupFeatures();
