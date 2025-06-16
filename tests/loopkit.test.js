@@ -648,7 +648,7 @@ describe('LoopKit SDK', () => {
       }
     });
 
-    it('should send API key as query parameter', async () => {
+    it('should send API key as a header', async () => {
       LoopKit.track('test_event');
       await LoopKit.flush();
 
