@@ -13,8 +13,8 @@ if [ -f .env ]; then
 fi
 
 # Configuration with defaults
-BUCKET_NAME="${S3_BUCKET:-loopkit-js-cdn}"
-SDK_PATH="${SDK_PATH:-javascript}"  # Organize by SDK type (configurable)
+BUCKET_NAME="${S3_BUCKET:-loopkit-public-cdn}"
+SDK_PATH="${SDK_PATH:-js}"  # Organize by SDK type (configurable)
 DIST_DIR="dist"
 CLOUDFRONT_DISTRIBUTION_ID="${CLOUDFRONT_DISTRIBUTION_ID:-}"
 UPLOAD_ALL_BUILDS="${UPLOAD_ALL_BUILDS:-false}"
