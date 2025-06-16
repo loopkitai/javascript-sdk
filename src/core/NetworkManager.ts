@@ -24,7 +24,6 @@ export class NetworkManager implements INetworkManager {
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'User-Agent': `@loopkit/javascript`,
         Authorization: `Bearer ${this.config.apiKey}`,
       };
 
