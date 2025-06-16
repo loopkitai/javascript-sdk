@@ -354,9 +354,6 @@ export interface INetworkManager {
   /** Send events to API */
   sendEvents(endpoint: string, payload: any, retryCount?: number): Promise<any>;
 
-  /** Send beacon for page unload */
-  sendBeacon(endpoint: string, payload: any): boolean;
-
   /** Update SDK configuration */
   updateConfig(config: LoopKitConfig): void;
 }

@@ -25,6 +25,7 @@ export class NetworkManager implements INetworkManager {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'User-Agent': `@loopkit/javascript`,
+        Authorization: `Bearer ${this.config.apiKey}`,
       };
 
       // Add compression header if enabled
@@ -32,15 +33,11 @@ export class NetworkManager implements INetworkManager {
         headers['Accept-Encoding'] = 'gzip, deflate';
       }
 
-      // Add API key as query parameter
-      const url = new URL(endpoint);
-      url.searchParams.set('apiKey', this.config.apiKey);
-      const finalEndpoint = url.toString();
-
       const requestOptions: RequestInit = {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
+        keepalive: true,
       };
 
       // Add timeout if supported
@@ -53,14 +50,14 @@ export class NetworkManager implements INetworkManager {
 
       // Get event count from payload for logging
       const eventCount = this.getEventCountFromPayload(payload);
-      this.logger.debug(`Sending ${eventCount} event(s) to ${finalEndpoint}`, {
+      this.logger.debug(`Sending ${eventCount} event(s) to ${endpoint}`, {
         retryCount,
         payload,
       });
 
       let response: Response | null = null;
       try {
-        response = await fetch(finalEndpoint, requestOptions);
+        response = await fetch(endpoint, requestOptions);
       } catch (networkError) {
         // This is a network-level error (connection failed, etc.)
         // Preserve the original error message and re-throw immediately
@@ -143,42 +140,6 @@ export class NetworkManager implements INetworkManager {
       });
 
       throw error;
-    }
-  }
-
-  /**
-   * Send beacon for page unload (fallback for critical events)
-   */
-  sendBeacon(endpoint: string, payload: any): boolean {
-    if (typeof navigator === 'undefined' || !navigator.sendBeacon) {
-      this.logger.warn('sendBeacon not available');
-      return false;
-    }
-
-    try {
-      // Add API key as query parameter
-      const url = new URL(endpoint);
-      url.searchParams.set('apiKey', this.config.apiKey);
-      const finalEndpoint = url.toString();
-
-      const data = JSON.stringify(payload);
-      const blob = new Blob([data], { type: 'application/json' });
-
-      const success = navigator.sendBeacon(finalEndpoint, blob);
-
-      if (success) {
-        this.logger.debug('Beacon sent successfully', {
-          endpoint: finalEndpoint,
-          payload,
-        });
-      } else {
-        this.logger.warn('Beacon failed to send', { endpoint: finalEndpoint });
-      }
-
-      return success;
-    } catch (error) {
-      this.logger.error('Beacon send error', { error });
-      return false;
     }
   }
 

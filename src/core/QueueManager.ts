@@ -144,7 +144,7 @@ export class QueueManager implements IQueueManager {
         promises.push(networkManager.sendEvents(endpoint, payload));
       }
 
-      // Wait for all requests to complete
+      // TODO: Migrate to Promise.allSettled and only requeue events that failed
       await Promise.all(promises);
 
       this.logger.debug(`Successfully flushed ${eventsToFlush.length} events`);

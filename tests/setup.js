@@ -25,11 +25,6 @@ Object.defineProperty(global, 'localStorage', {
 });
 
 // Mock navigator
-Object.defineProperty(navigator, 'sendBeacon', {
-  writable: true,
-  value: jest.fn(() => true),
-});
-
 Object.defineProperty(navigator, 'doNotTrack', {
   writable: true,
   value: '0',
