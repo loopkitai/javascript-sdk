@@ -160,49 +160,9 @@ export class BrowserFeatures implements IBrowserFeatures {
 
     this.unloadHandler = () => {
       try {
-        // Try to flush remaining events using beacon API
+        // Try to flush remaining events
         if (this.queueManager.getQueueSize() > 0 && this.networkManager) {
-          const events = this.queueManager.getQueue();
-
-          if (events.length > 0) {
-            // Group events by type and send to separate endpoints
-            const tracks: any[] = [];
-            const identifies: any[] = [];
-            const groups: any[] = [];
-
-            events.forEach(({ type, event }) => {
-              switch (type) {
-                case 'track':
-                  tracks.push(event);
-                  break;
-                case 'identify':
-                  identifies.push(event);
-                  break;
-                case 'group':
-                  groups.push(event);
-                  break;
-              }
-            });
-
-            // Send to separate endpoints using beacon API
-            if (tracks.length > 0) {
-              const endpoint = `${this.config.baseURL}/tracks`;
-              const payload = { tracks };
-              this.networkManager.sendBeacon(endpoint, payload);
-            }
-
-            if (identifies.length > 0) {
-              const endpoint = `${this.config.baseURL}/identifies`;
-              const payload = { identifies };
-              this.networkManager.sendBeacon(endpoint, payload);
-            }
-
-            if (groups.length > 0) {
-              const endpoint = `${this.config.baseURL}/groups`;
-              const payload = { groups };
-              this.networkManager.sendBeacon(endpoint, payload);
-            }
-          }
+          this.queueManager.flush(this.networkManager);
         }
       } catch (error) {
         this.logger.error('Error in unload handler', { error });

@@ -90,7 +90,6 @@ class BrowserFeatures {
   setupAutoPageViews()
   setupAutoClickTracking()
   setupErrorTracking()
-  sendBeacon()
   getClickableElementInfo(element)
   isClickableElement(element)
   // Move all browser-specific logic from original

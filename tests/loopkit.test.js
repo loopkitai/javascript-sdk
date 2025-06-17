@@ -648,39 +648,16 @@ describe('LoopKit SDK', () => {
       }
     });
 
-    it('should send API key as query parameter', async () => {
+    it('should send API key as a header', async () => {
       LoopKit.track('test_event');
       await LoopKit.flush();
 
       expect(global.fetch).toHaveBeenCalled();
-      const [url] = global.fetch.mock.calls[0];
+      const [, options] = global.fetch.mock.calls[0];
 
       // Verify the URL contains the API key as a query parameter
-      expect(url).toContain('?apiKey=test-api-key');
-      expect(url).toContain('/tracks');
-    });
-
-    it('should send API key as query parameter in beacon requests', () => {
-      // Mock sendBeacon to capture the URL
-      const originalSendBeacon = navigator.sendBeacon;
-      const mockSendBeacon = jest.fn(() => true);
-      navigator.sendBeacon = mockSendBeacon;
-
-      // Access the NetworkManager instance to test beacon directly
-      const networkManager = LoopKit.networkManager;
-      const testPayload = { tracks: [{ name: 'test_event' }] };
-
-      networkManager.sendBeacon('https://api.example.com/tracks', testPayload);
-
-      expect(mockSendBeacon).toHaveBeenCalled();
-      const [url] = mockSendBeacon.mock.calls[0];
-
-      // Verify the beacon URL contains the API key as a query parameter
-      expect(url).toContain('?apiKey=test-api-key');
-      expect(url).toContain('/tracks');
-
-      // Restore original sendBeacon
-      navigator.sendBeacon = originalSendBeacon;
+      expect(options.headers).toHaveProperty('Authorization');
+      expect(options.headers.Authorization).toBe('Bearer test-api-key');
     });
   });
 
