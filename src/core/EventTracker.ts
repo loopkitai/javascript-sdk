@@ -187,6 +187,7 @@ export class EventTracker {
 
     return {
       anonymousId: this.sessionManager.getAnonymousId(),
+      sessionId: this.sessionManager.getSessionId(),
       timestamp: now,
       system: this.createSystemInfo(),
     };
@@ -201,7 +202,6 @@ export class EventTracker {
         name: '@loopkit/javascript',
         version: typeof __VERSION__ !== 'undefined' ? __VERSION__ : '1.0.5',
       },
-      sessionId: this.sessionManager.getSessionId(),
     };
 
     // Add browser context if in browser environment

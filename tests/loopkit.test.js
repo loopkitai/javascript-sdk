@@ -530,6 +530,9 @@ describe('LoopKit SDK', () => {
       expect(event).toHaveProperty('anonymousId');
       expect(typeof event.anonymousId).toBe('string');
 
+      expect(event).toHaveProperty('sessionId');
+      expect(typeof event.sessionId).toBe('string');
+
       expect(event).toHaveProperty('timestamp');
       expect(typeof event.timestamp).toBe('string');
       // Verify ISO 8601 format
@@ -549,9 +552,6 @@ describe('LoopKit SDK', () => {
       expect(event.system.sdk).toHaveProperty('name', '@loopkit/javascript');
       expect(event.system.sdk).toHaveProperty('version');
       expect(typeof event.system.sdk.version).toBe('string');
-
-      expect(event.system).toHaveProperty('sessionId');
-      expect(typeof event.system.sessionId).toBe('string');
 
       // Context should be present in browser environment (jsdom)
       expect(event.system).toHaveProperty('context');

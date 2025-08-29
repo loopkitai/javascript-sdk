@@ -62,6 +62,8 @@ export type RetryBackoff = 'exponential' | 'linear';
 export interface BaseEvent {
   /** Unique anonymous identifier */
   anonymousId: string;
+  /** Session ID */
+  sessionId: string;
   /** ISO 8601 timestamp */
   timestamp: string;
   /** User ID (if identified) */
@@ -113,8 +115,6 @@ export interface SystemInfo {
     name: string;
     version: string;
   };
-  /** Session ID */
-  sessionId: string;
   /** Browser/environment context */
   context?: ContextInfo;
 }
